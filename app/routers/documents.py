@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import SessionLocal, engine, Base
@@ -9,8 +10,12 @@ from ..utils.text import chunk_text
 
 router = APIRouter(tags=["documents"])
 
+SKIP_DB_INIT = os.getenv("SKIP_DB_INIT", "false").lower() == "true"
+
 @router.on_event("startup")
 async def startup():
+    if SKIP_DB_INIT:
+        return
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
