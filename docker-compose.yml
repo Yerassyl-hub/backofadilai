@@ -1,0 +1,49 @@
+# Docker Compose для локальной разработки
+# Для production используйте Render или другой хостинг
+
+services:
+  # PostgreSQL база данных
+  db:
+    image: postgres:16
+    container_name: adilai_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: adilai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # FastAPI приложение
+  api:
+    build: .
+    container_name: adilai_api
+    depends_on:
+      - db
+    env_file: .env
+    environment:
+      # Переопределяем DB_HOST для работы внутри Docker сети
+      DB_HOST: db
+      DB_PORT: 5432
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # Ngrok для туннелирования (опционально, только для разработки)
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: adilai_ngrok
+    depends_on:
+      - api
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    command: http adilai_api:8000
+    ports:
+      - "4040:4040"  # Ngrok Web UI/API
+    restart: unless-stopped
+    profiles:
+      - ngrok  # Запускается только с флагом: docker compose --profile ngrok up
+
+volumes:
+  pgdata: {}
