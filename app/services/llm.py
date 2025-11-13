@@ -9,18 +9,31 @@ from ..config import settings
 PERPLEXITY_BASE_URL = "https://api.perplexity.ai"
 
 
+class LLMConfigurationError(Exception):
+    """Ошибка конфигурации LLM (отсутствует API ключ и т.д.)"""
+    pass
+
+
+class LLMServiceError(Exception):
+    """Ошибка при обращении к LLM сервису"""
+    pass
+
+
 async def _pplx_chat(
     messages: List[Dict[str, str]],
     temperature: float = 0.2,
     force_model: str | None = None,
     cheap_first: bool | None = None,
 ) -> Tuple[str, str]:
+    if not settings.PERPLEXITY_API_KEY:
+        raise LLMConfigurationError(
+            "PERPLEXITY_API_KEY is not set. Please configure PERPLEXITY_API_KEY in environment variables."
+        )
+    
     headers = {
         "Authorization": f"Bearer {settings.PERPLEXITY_API_KEY}",
         "Content-Type": "application/json",
     }
-    if not settings.PERPLEXITY_API_KEY:
-        raise RuntimeError("PERPLEXITY_API_KEY is not set")
 
     # Build candidate list with cost-aware ordering.
     cheap_first = settings.LLM_PREFER_CHEAPEST if cheap_first is None else cheap_first
@@ -73,13 +86,17 @@ async def _pplx_chat(
                     last_detail = resp.json()
                 except Exception:
                     last_detail = {"text": resp.text}
-                raise RuntimeError(f"Perplexity API error {resp.status_code}: {last_detail}") from e
+                raise LLMServiceError(
+                    f"Perplexity API error {resp.status_code}: {last_detail}"
+                ) from e
             data = resp.json()
             content = (data.get("choices", [{}])[0].get("message", {}) or {}).get("content", "") or ""
             model_used = data.get("model") or model
             return content, model_used
 
-    raise RuntimeError(f"Perplexity API invalid_model for all candidates: {models_to_try}. Last detail: {last_detail}")
+    raise LLMServiceError(
+        f"Perplexity API invalid_model for all candidates: {models_to_try}. Last detail: {last_detail}"
+    )
 
 
 async def chat_text(

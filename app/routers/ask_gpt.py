@@ -5,7 +5,7 @@ from typing import List, Literal, Optional
 
 from ..schemas import Source
 from ..utils.citations import annotate_answer_with_citations
-from ..services.llm import chat_text, chat_messages
+from ..services.llm import chat_text, chat_messages, LLMConfigurationError, LLMServiceError
 
 router = APIRouter(tags=["assistant"])
 
@@ -54,6 +54,16 @@ async def ask(req: AskRequest):
             force_model=req.model,
             cheap_first=True,
         )
+    except LLMConfigurationError as e:
+        raise HTTPException(
+            status_code=502,
+            detail="Сервис временно недоступен из-за проблем с конфигурацией на сервере. Пожалуйста, обратитесь к администратору."
+        )
+    except LLMServiceError as e:
+        raise HTTPException(
+            status_code=502,
+            detail="Сервер временно недоступен. Пожалуйста, попробуйте позже."
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Upstream LLM error: {e}")
 
@@ -101,6 +111,16 @@ async def chat(req: ChatRequest):
             temperature=temp,
             force_model=req.model,
             cheap_first=True,
+        )
+    except LLMConfigurationError as e:
+        raise HTTPException(
+            status_code=502,
+            detail="Сервис временно недоступен из-за проблем с конфигурацией на сервере. Пожалуйста, обратитесь к администратору."
+        )
+    except LLMServiceError as e:
+        raise HTTPException(
+            status_code=502,
+            detail="Сервер временно недоступен. Пожалуйста, попробуйте позже."
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Upstream LLM error: {e}")

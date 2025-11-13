@@ -5,6 +5,7 @@ from ..db import get_session_local, SKIP_DB
 from ..schemas import AnalyzeRequest, AnalyzeResponse, Citation
 from ..services.rag import build_prompt_and_citations, call_llm
 from ..services.risk_rules import rule_flags
+from ..services.llm import LLMConfigurationError, LLMServiceError
 
 router = APIRouter(tags=["analyze"])
 
@@ -42,6 +43,16 @@ async def analyze(req: AnalyzeRequest):
         prompt, cits = await build_prompt_and_citations(session, req)
         try:
             llm_out = await call_llm(prompt)
+        except LLMConfigurationError as e:
+            raise HTTPException(
+                status_code=502,
+                detail="Сервис временно недоступен из-за проблем с конфигурацией на сервере. Пожалуйста, обратитесь к администратору."
+            )
+        except LLMServiceError as e:
+            raise HTTPException(
+                status_code=502,
+                detail="Сервер временно недоступен. Пожалуйста, попробуйте позже."
+            )
         except Exception as e:
             # Return upstream error to client without crashing the server
             raise HTTPException(status_code=502, detail=f"Upstream LLM error: {e}")
