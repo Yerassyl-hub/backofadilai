@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..db import SessionLocal, engine, Base
+from ..db import get_session_local, get_engine, Base, SKIP_DB
 from ..models import Document, Chunk
 from ..schemas import UploadResponse
 from ..services.extract import extract_text
@@ -10,14 +10,7 @@ from ..utils.text import chunk_text
 
 router = APIRouter(tags=["documents"])
 
-SKIP_DB_INIT = os.getenv("SKIP_DB_INIT", "false").lower() == "true"
-
-@router.on_event("startup")
-async def startup():
-    if SKIP_DB_INIT:
-        return
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+# Инициализация БД на startup убрана - приложение запускается без подключения к БД
 
 @router.post("/documents/upload", response_model=UploadResponse)
 async def upload_document(file: UploadFile = File(...), tenant_id: str = Form(...)):
@@ -28,6 +21,13 @@ async def upload_document(file: UploadFile = File(...), tenant_id: str = Form(..
 
     chunks = chunk_text(text, target_tokens=300)
     embeddings = await embed_texts(chunks)
+
+    if SKIP_DB:
+        raise HTTPException(503, "Database is disabled. Set SKIP_DB=false to enable.")
+
+    SessionLocal = get_session_local()
+    if SessionLocal is None:
+        raise HTTPException(503, "Database connection is not available.")
 
     async with SessionLocal() as session:  # type: AsyncSession
         doc = Document(tenant_id=tenant_id, filename=file.filename, content=text[:10000])
