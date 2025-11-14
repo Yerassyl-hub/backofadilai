@@ -128,4 +128,19 @@ async def chat(req: ChatRequest):
     text = text.strip().strip("`").strip()
     text = text.replace("**", "")
     text, sources = annotate_answer_with_citations(text)
-    return {"answer": text, "model": model_used or "unknown", "sources": sources}
+    
+    # Убеждаемся, что sources всегда список и в правильном формате
+    formatted_sources = []
+    for src in sources:
+        formatted_sources.append({
+            "title": src.get("title"),
+            "url": src.get("url", ""),  # url обязателен
+            "snippet": src.get("snippet"),
+            "referenceIndex": src.get("referenceIndex") or src.get("id"),
+        })
+    
+    return {
+        "answer": text,
+        "model": model_used or "unknown",
+        "sources": formatted_sources
+    }

@@ -50,6 +50,17 @@ def _insert_marker(text: str, needle: str, idx: int) -> str:
 
 
 def annotate_answer_with_citations(answer: str) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    Аннотирует ответ ссылками и возвращает источники в формате для фронтенда.
+    
+    Возвращает:
+        - annotated: текст с маркерами [1], [2] и т.д.
+        - sources: список источников с полями:
+            - url (обязательное) - должен начинаться с http:// или https://
+            - title (опциональное)
+            - snippet (опциональное)
+            - referenceIndex (обязательное) - номер ссылки, соответствует [1], [2] в тексте
+    """
     citations = _collect_citations(answer)
     if not citations:
         return answer, []
@@ -57,10 +68,15 @@ def annotate_answer_with_citations(answer: str) -> Tuple[str, List[Dict[str, Any
     annotated = answer
     sources: List[Dict[str, Any]] = []
     for idx, cite in enumerate(citations, start=1):
+        url = adilet_link(cite)
+        # Убеждаемся, что URL валидный (начинается с http:// или https://)
+        if not url.startswith(("http://", "https://")):
+            url = f"https://{url}" if not url.startswith("//") else f"https:{url}"
+        
         sources.append({
             "id": idx,
             "title": cite,
-            "url": adilet_link(cite),
+            "url": url,
             "snippet": None,
             "referenceIndex": idx,
         })
